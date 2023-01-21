@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+    
+<head>
+<style>
+html,body{
+	margin: 0;
+	padding: 0;
+	background-color: #2e2e2e;
+	color: #d1d1d1;
+	font-family: Arial, sans-serif;
+	font-size: 11px;
+}
+.addrEach{
+	display: inline-block;
+	position: relative;
+	margin: 2px;
+	border: 1px solid #ffc107;
+	border-radius: 5px;
+	padding: 7px;
+	cursor: pointer;
+}
+.addrEach:hover{
+	border: 1px solid #ffea07;
+	cursor: pointer;
+}
+.green { background-color: #00cc00; }
+#floating_exchange_div{
+	position: absolute;
+	top: 7px;
+	right: 10px;
+}
+button {
+	margin: 2px;
+	border: 1px solid #ffc107;
+	border-radius: 5px;
+	padding: 7px;
+}
+.frm{
+	border: 1px solid #ffc107;
+	border-radius: 5px;
+	background-color: #1d1d1d;
+	padding: 4px;
+	color: #e0e0e0;
+}
+.addr{
+	font-weight: bold;
+	color: #f0f0f0;
+	font-size: 13px;
+	text-shadow:
+    0 0 1px #fff,
+    0 0 1.6px #fff;
+}
+#amtsats{
+	background-color: #ccc;
+}
+.wideinput{
+	width: 500px;
+}
+
+.utxoEach{
+	position: relative; 
+	float: right;
+}
+#action_container{
+	position: relative;
+	display: none;
+}
+#consolidateBtn{
+	position: relative;
+	display: none;
+}
+#send_container{
+	position: relative;
+	display: none;
+}
+a {
+	color: #0275d8;
+}
+a:visited {
+	color: #0275d8;
+}
+#backupblock{
+	display: none;
+}
+.subnum{
+	font-size: 2rem;
+	color: #aaa;
+}
+.eachword{
+	display: inline-block;
+	margin: 10px;
+	padding: 4px;
+	border: 1px solid #e1e1e1;
+}
+#recQR{
+	width: 260px;
+	margin: auto;
+	position: relative;
+	padding: 10px;
+	background-color: #fff;
+}
+</style>
+<script src="buidl.js"></script>
+<script src="qrcode.js"></script>
+<script src="jquery-3.2.1.min.js"></script>
+</head>
+    
+<body>
+Last Block Parsed: <span id="lastblk"></span><br>
+<button id="gobtn" onclick="return startParse();">Parse</button> <button id="gobtn" onclick="return savedutxo();">View Found TXOs</button>
+<div id="output">
+</div>
+
+<hr>
+<h3>TXOs</h3>
+<table style="width: 100%;">
+<tr>
+	<td>
+		<!-- Receive block visible by default -->
+		<div class="card border-primary mb-3" style="max-width: 100rem;" id="receiveblock">
+		  
+		  <div class="card-body" style="text-align: center;">
+			<div id="recQR"></div>
+			<h4 class="card-title" id="recAddr"></h4>
+			<p class="card-text">Receive bitcoin by sharing this address.</p>
+			<button type="button" class="btn btn-outline-primary" onclick="return newAddr();">Get New Address</button>
+			<br>
+			Address <span id="countOut">0</span> / 250
+		  </div>
+		</div>
+	</td>
+	<td style="padding: 10px;" align="center">
+		<h3>Spendable Transaction Outputs</h3>
+		<div id="addr_container" style="text-align: center; border: 2px dashed #d1d1d1; padding:10px;">
+		[Click on "View Found TXOs" Button]
+		</div>
+	</td>
+</tr>
+</table>
+
+
+<!-- Back Up block invisible by default -->
+<div class="card border-primary mb-3" style="max-width: 100rem;" id="backupblock">
+  
+  <div class="card-body" style="text-align: center;">
+    <h4 class="card-title">Mnemonic Back Up</h4>
+    <p class="card-text">Write down these words to back up your wallet. We use the BIP84 derivation path.</p>
+	<button type="button" class="btn btn-outline-primary" onclick="return showWords();">Reveal Words</button>
+	<button type="button" class="btn btn-outline-danger" onclick='return confirm("Are you sure this will erase your existing wallet. BE SURE TO SAVE YOUR MNEMONIC WORDS BEFORE ATTEMPTING TO IMPORT/RECOVER!")?importWallet():null;'>Import/Recover</button>
+	<div id="mnemonicOut" class="form-group"></div>
+  </div>
+</div>
+<br>
+<hr>
+<h3>Spend</h3>
+<table width="100%">
+<tr><td>
+<div id="utxo_container">
+</div>
+<br>
+<div id="action_container">
+<center><button id="sendBtn" type="button" onclick="return sendtobutton();">Send Funds</button></center>
+<!-- <button id="consolidateBtn" type="button">Consolidate UTXOs</button> -->
+</div>
+</td><td>
+<div id="send_container">
+To Address: <input type="text" class="frm wideinput" id="toaddress"><br>
+Amount to Send: <input type="number" id="sendamount" class="frm" onchange="return recalcSend();"><br>
+Fee Rate (satoshis per byte): <input type="number" value="10" class="frm" id="satperbyte" onchange="return recalcFee();"><br>
+Fee: <input type="number" class="frm" id="feeamount" readonly><br>
+Change: <input type="number" class="frm" id="changeamount" readonly><br>
+Where to send change: <input type="text" class="frm wideinput" id="changeaddress"><br>
+WIF Private Key: <input type="password" id="wifpkey" class="frm wideinput">
+<div width="100%" style="text-align: center;"><button type="button" id="analyze">RELEASE FUNDS</button></div>
+</div>
+</td></tr>
+<tr>
+<td colspan="2">
+<div id="hexout" style="background-color: #1d1d1d; color: #f0f0f0;"></div>
+</td>
+</tr>
+</table>
+
+<div id="floating_exchange_div"><button id="backupbtn" href="#" id="backuplink" onclick="return showBackUp();">Back-Up</button>
+<input type="hidden" id="viewing">
+<input type="hidden" id="totalselected" value="0">
+<input type="hidden" id="availableafterfee" value="0">
+</div>
+<script>
+//get current blockheight
+
+//init wallet, create new or load existing
+function createNewWallet(){ 
+	let newWords = buidl.newMnemonic();
+	let justWords = newWords.words;
+	let hdeeseed = buidl.mnemonic2SeedHex(justWords)
+	let zpub = buidl.seedToXpub(hdeeseed.seedHex,84,0)
+	let pool = []
+	for(var i=0;i<250;i++){
+		//add addrs from xpub to array
+		let loadchild = buidl.fromXpub(zpub,0,i);
+		pool.push(loadchild.addr)
+	}
+	//popular addr that receives txs every block for testing
+	//pool.push("bc1q7cyrfmck2ffu2ud3rn5l5a8yv6f0chkp0zpemf");
+	 $.ajax({
+		async: true,
+		type: "GET",
+		url: "https://blockchain.info/stats?format=json",
+		success: function(res) {
+			var blockheight = res.n_blocks_total;
+			window.localStorage.setItem("ALN", justWords);
+			window.localStorage.setItem("ALNSTART", blockheight); 
+			window.localStorage.setItem("ALNXPUB", zpub);
+			window.localStorage.setItem("ALNPOOL", JSON.stringify(pool));
+			fw = justWords;
+		}
+	 });
+ 
+ 
+}
+
+//retreive localstorage item labeled fastWallet
+var fw = localStorage.getItem("ALN");
+
+//check if retreival is null, if it is run createNewWallet function
+fw === null ? createNewWallet() : fw; 
+
+var infostart = window.localStorage.getItem("ALNSTART"); 
+var alnzpub = window.localStorage.getItem("ALNXPUB");
+$("#lastblk").html(infostart);
+
+
+
+//get from local storage pool
+var alnpool = window.localStorage.getItem("ALNPOOL");
+var addrsarr = JSON.parse(alnpool);
+
+var addrCounter = 0;
+var addr = addrsarr[0];
+$("#recAddr").html(addr);
+new QRCode(document.getElementById("recQR"), addr);
+
+function newAddr(){
+	if(addrCounter > 249){
+		addrCounter = 0;
+	} else {
+	    addrCounter++;
+	}
+	$("#recQR").fadeOut(200);
+	$("#recAddr").fadeOut(200,function(){
+		var newaddress = addrsarr[addrCounter];
+		$("#recQR").html("");
+		new QRCode(document.getElementById("recQR"), newaddress);
+		$("#recAddr").html(newaddress);
+		$("#recAddr").fadeIn(100);
+		$("#recQR").fadeIn(100);
+		$("#countOut").html(addrCounter);
+		
+		//console.log(addrCounter);
+	});
+}
+
+function startParse(){
+	console.log("starting")
+	$.ajax({
+		async: false,
+		type: "GET",
+		url: "https://blockchain.info/stats?format=json",
+		success: function(res) {
+			console.log(res)
+			var blockheight = res.n_blocks_total;
+			
+			var startblock = window.localStorage.getItem("ALNSTART"); 
+			var currentblock = blockheight; 
+			var checkblock = startblock;
+			var startint = parseInt(checkblock);
+			console.log(startint);
+			var currentint = parseInt(currentblock);
+			console.log(currentint);
+			var blockdiff = (currentint - startint);
+			blockdiff++;
+			console.log(checkblock);
+			console.log(blockdiff);
+						
+			
+			for(i=0;i<blockdiff;i++){
+				//only do 24 blocks max per click
+				if(i<24){
+				
+					//scan block tx outputs for match
+					var blockhurl = "https://mempool.space/api/block-height/"+checkblock
+					$.ajax({
+						async: false,
+						type: "GET",
+						url: blockhurl,
+						success: function(blkres){
+							var blockhash = blkres;
+							console.log(blockhash);
+							var txsurl = "https://mempool.space/api/block/"+blockhash+"/txs"
+							//$("#output").append("hash: "+blockhash+"<br>");
+							
+							$.ajax({
+								async: false,
+								type: "GET",
+								url: txsurl,
+								success: function(txsres){
+									var txslen = txsres.length;
+									for(var ii=0; ii<txslen; ii++){
+										//$("#output").append("TX: "+txsres[ii].txid+"<br>");
+										console.log(txsres[ii].txid);
+										var txoouts = txsres[ii].vout.length;
+										for(var iii=0; iii<txoouts; iii++){
+											var toutaddr = txsres[ii].vout[iii].scriptpubkey_address;
+											//console.log(toutaddr);
+											//check for match
+											var addrmatch = addrsarr.includes(toutaddr);
+											var toutvalue = txsres[ii].vout[iii].value;
+											var toutvout = iii;
+											var maketxo = {};
+											maketxo.txid = txsres[ii].txid;
+											maketxo.vout = toutvout;
+											maketxo.value = toutvalue;
+											maketxo.type = "txo";
+											maketxo.addr = toutaddr;
+											var txostring = JSON.stringify(maketxo);
+											if(addrmatch){
+												//create txo object & save to localStorage
+												var timenow = new Date();
+												timenow = timenow.getTime();
+												window.localStorage.setItem(timenow, txostring); 
+												//$("#output").append("out: "+toutaddr+"  "+toutvalue+" <br>");
+											}
+											
+										}
+									}
+								}
+							});
+							
+						}
+					});
+					//block has been parsed update start block
+					$("#lastblk").html(checkblock);
+					window.localStorage.setItem("ALNSTART", checkblock); 
+					checkblock++;
+				
+				
+				}
+				
+			}
+			
+			
+			
+		}
+	 });
+	
+}
+
+function savedutxo(){
+	//load UTXO objects
+	$("#addr_container").html("");
+	let lslen = window.localStorage.length;
+	for(i=0;i<lslen;i++){
+		let loopkey = window.localStorage.key(i);
+		let loopitem = window.localStorage.getItem(loopkey);
+		try{
+			let loopparse = JSON.parse(loopitem);
+			if(loopparse.type==="txo"){
+				//make utxo buttons
+				var addrstring = loopparse.addr;
+				var addrsub1 = addrstring.substr(0,5)
+				var addrsub2 = addrstring.substr(addrstring.length-4,addrstring.length)
+				var addrformatted = addrsub1+"..."+addrsub2;
+				$("#addr_container").append('<div class="addrEach" id="'+loopkey+'"><span class="addr">'+addrformatted+'</span><br>'+loopparse.value+' SATS</div>');
+			}
+		} catch(err){
+			continue;
+		}
+		
+	}
+	
+	var addrObjs = document.getElementsByClassName("addrEach"); 
+
+	for(i=0;i<addrObjs.length;i++){
+		var addrBlock = addrObjs[i];
+		addrBlock.onclick = function(){
+			console.log(this.id)
+			let clickitem = window.localStorage.getItem(this.id);
+			clickparse = JSON.parse(clickitem);
+			console.log(clickparse.addr);
+			$("#viewing").val(clickparse.addr);
+			var utxosSelected = document.getElementsByClassName("green");
+					$(this).toggleClass("green");
+					if($(this).hasClass("green")){
+						
+						var addval = parseFloat(clickparse.value);
+						console.log("added "+addval);
+						var existAmt = parseFloat($("#totalselected").val())
+						var newAmt = addval + existAmt;
+						$("#totalselected").val(newAmt)
+							 
+							if(utxosSelected.length > 0){
+								//show send to button
+								console.log("only show send")
+								$("#action_container").fadeIn();
+								$("#consolidateBtn").hide();
+								if(utxosSelected.length > 1){
+									//show consolidate button
+									console.log("show send and consolidate")
+									//$("#consolidateBtn").fadeIn();
+								}
+							} else {
+									$("#action_container").fadeOut();
+							}
+						
+						
+						
+						
+						
+					} else {
+						
+						var addval = parseFloat(clickparse.value);
+						var existAmt = parseFloat($("#totalselected").val())
+						var newAmt = existAmt - addval;
+						$("#totalselected").val(newAmt)
+							
+								if(utxosSelected.length > 0){
+									//show send to button
+									console.log("only show send")
+									$("#action_container").fadeIn();
+									$("#consolidateBtn").hide();
+									if(utxosSelected.length > 1){
+										//show consolidate button
+										console.log("show send and consolidate")
+										//$("#consolidateBtn").fadeIn();
+									}
+								} else {
+									$("#action_container").fadeOut();
+								}			
+													
+						
+					}
+					
+		}
+				  
+	}
+	
+	$("#analyze").click(function(){
+			var selectnum = document.getElementsByClassName("green");
+			inputlen = selectnum.length;
+			inputstousearray = [];
+			signingchildkeys = [];
+			for(var i=0;i<inputlen;i++){
+				inputstousearray.push(selectnum[i].id);
+			}
+			console.log(inputstousearray);
+			var totalSatoshis = 0;
+			NETWORK = b.bitcoin.networks.bitcoin;
+			var txb = new b.bitcoin.TransactionBuilder(NETWORK)
+							
+				for(var ii=0;ii<inputlen;ii++){
+					//looping through selected utxos
+					var inputtouse = inputstousearray[ii];			
+					let looputxo = window.localStorage.getItem(inputtouse);							
+					let parseutxo = JSON.parse(looputxo);		
+					
+					
+					
+					//change wif input to a wallet passphrase input
+					//calc bip39 +passphrase hd seedHex
+					let shhh = window.localStorage.getItem(ALN);
+					let hdeeseed = buidl.mnemonic2SeedHex(shhh);
+					//check address against ALNPOOL and return array position
+					//fromHDSeed match address with array position
+					let alnpool = window.localStorage.getItem(ALNPOOL);
+					let parsedpool = JSON.parse(alnpool);
+					let childkeypos = parsedpool.indexOf(parseutxo.addr);
+					let parsemnemonic = buidl.fromHDSeed(hdeeseed.seedHex,84,0,0,childkeypos);
+					let childkey = parsemnemonic.pk;
+					signingchildkeys.push(childkey);
+					let WIF = $("#wifpkey").val(childkey); //private key of p2wpkh output
+					
+					let keypair = b.bitcoin.ECPair.fromWIF(WIF, NETWORK);			
+					let scriptPubkey = b.bitcoin.script.witnessPubKeyHash.output.encode(
+										b.bitcoin.crypto.hash160(	
+										keypair.getPublicKeyBuffer()
+										)
+						   );
+					
+						txb.addInput(parseutxo.txid,
+									parseutxo.vout,
+									0xffffffff,
+									scriptPubkey)
+						totalSatoshis = parseFloat(totalSatoshis) + parseFloat(parseutxo.value);
+						console.log(totalSatoshis);
+						
+				}
+				
+				//add output
+				var toaddress = $("#toaddress").val();
+				var toaddressamt = $("#sendamount").val();
+				toaddressamt = parseFloat(toaddressamt);
+				var changeaddress = $("#changeaddress").val();
+				var changeaddressamt = $("#changeamount").val();
+				changeaddressamt = parseFloat(changeaddressamt);
+				txb.addOutput(toaddress,toaddressamt);
+				if(changeaddressamt<1000){
+				} else {
+					if(changeaddress.length<1){
+					} else {
+						txb.addOutput(changeaddress,changeaddressamt);
+					}	
+				}
+				//sign each input
+				for(var iiii=0;iiii<inputlen;iiii++){
+					var inputtouse = inputstousearray[iiii];
+					let findutxo = window.localStorage.getItem(inputtouse);							
+					let parsedutxo = JSON.parse(findutxo);
+					var inputvalue = parsedutxo.value;
+					let signingpair = b.bitcoin.ECPair.fromWIF(signingchildkeys[iiii], NETWORK);
+					txb.sign(iiii, signingpair, null, null, inputvalue);
+				}
+				
+				var tx = txb.build();
+				txhex = tx.toHex();
+			
+			
+				$.ajax({
+					async: true,
+					type: "POST",
+					url: "https://api.blockchair.com/bitcoin/push/transaction",
+					contentType: 'application/json',
+					dataType: "json",
+					data: JSON.stringify({data: txhex}),
+					success: function(result) {
+					  console.log("Transaction sent!");
+					  $("#hexout").html(JSON.stringify(result));
+					}
+				  });
+			
+		
+		});
+	
+}
+
+
+
+</script>
+<script>
+function sendtobutton(){
+	$("#send_container").fadeIn();
+	var fromaddress = $("#viewing").val()
+	var satPerByte = $("#satperbyte").val()
+	$("#changeaddress").val(fromaddress);
+	//default amount based on leftover after fee
+	var totalSatsSelected = $("#totalselected").val()
+	var numofinputs = document.getElementsByClassName("green").length;
+	$("#changeamount").val(0)
+	
+	var amounttosend = calcTotal(numofinputs,1,satPerByte,totalSatsSelected)
+	$("#sendamount").val(amounttosend)
+	$("#availableafterfee").val(amounttosend);
+	feecheck();
+}
+
+function recalcFee(){
+	var satPerByte = $("#satperbyte").val()
+	var totalSatsSelected = $("#totalselected").val()
+	var numofinputs = document.getElementsByClassName("green").length;
+	var numofoutputs = 1;
+	var changeoutamt = 0;
+	var totalSatsLessChange = totalSatsSelected;
+	if($("#changeamount").val() > 3000){ 
+		numofoutputs = 2;
+		changeoutamt = $("#changeamount").val();
+		totalSatsLessChange = totalSatsSelected - changeoutamt;
+	}
+	var amounttosend = calcTotal(numofinputs,numofoutputs,satPerByte,totalSatsLessChange)
+	$("#sendamount").val(amounttosend)
+	feecheck();
+}
+
+function recalcSend(){
+	var available = $("#availableafterfee").val()
+	var newamount = $("#sendamount").val()
+	var newchangeamt = available - newamount;
+	var totalSatsSelected = $("#totalselected").val()
+	if(newchangeamt > 0){
+		$("#changeamount").val(newchangeamt)
+	} else {
+		$("#sendamount").val(available)
+		$("#changeamount").val(0)
+	}
+	feecheck();
+}
+
+function feecheck(){
+	var totalSatsSelected = $("#totalselected").val()
+	var amounttosend = $("#sendamount").val()
+	var changeoutamt = $("#changeamount").val();
+	var feeamt = totalSatsSelected - amounttosend - changeoutamt; 
+	$("#feeamount").val(feeamt)
+}
+
+function sendfunds(){
+	  //get fee rate from input
+      var satPerByte = $("#satperbyte").val()
+      if (satPerByte == "") {
+        alert("Please enter Satoshi Per Byte Fee Rate!")
+        return
+      }
+}
+
+function showBackUp(){
+	var checkactive = document.getElementById("backupblock").classList.contains("active");
+	
+	if(checkactive){
+		$("#backupblock").fadeOut(200, function(){
+	    
+			$("#addr_container").fadeIn(100);
+			$("#backupblock").removeClass("active");
+			$("#receiveblock").fadeIn(100);
+		});
+	} else {
+		$("#addr_container").fadeOut(200, function(){
+			$("#receiveblock").fadeOut(100);
+			$("#backupblock").fadeIn(100);
+			$("#backupblock").addClass("active");
+		
+		});
+	}
+	
+}
+
+function showWords(){
+    $("#mnemonicOut").html("");
+	let splitwords = fw.split(" ");
+	let wordcounter = 1;
+	for(var i = 0; i<splitwords.length; i++){
+		$("#mnemonicOut").append('<span class="eachword"><span class="subnum">'+wordcounter+'</span> '+splitwords[i]+'</span>');
+		wordcounter++;
+	}
+	
+}
+
+function importWallet(){
+	console.log("import wallet");
+	$("#mnemonicOut").html('<br><input type="text" class="wideinput" id="mnemonicInput" placeholder="ENTER YOUR 12 WORD MNEMONIC BACK UP SEPARATED BY A SPACE"><button class="btn btn-outline-secondary" onclick="return doImport();">Import</button><br><br>Alternatively, you can erase your current wallet and create a new one.<br><button class="btn btn-outline-danger" onclick="return doDelete();">Erase Wallet</button>');
+}
+
+function doImport(){
+    var recoveryIn = $("#mnemonicInput").val();
+	
+	window.localStorage.setItem("ALN", recoveryIn); 
+    fw = recoveryIn;
+	$("#mnemonicOut").html("Mnemonic phrase imported. Refreshing...");
+	$("#mnemonicOut").fadeOut(2000,function(){
+		location.reload();
+	});
+}
+
+function doDelete(){
+	//load UTXO objects
+	$("#mnemonicOut").html("Wallet deleting...");
+	let lslen = window.localStorage.length;
+	for(i=0;i<lslen;i++){
+		let loopkey = window.localStorage.key(i);
+		let loopitem = window.localStorage.getItem(loopkey);
+		try{
+			let loopparse = JSON.parse(loopitem);
+			if(loopparse.type==="txo"){
+				//delete utxo
+				window.localStorage.removeItem(loopkey);
+			}
+		} catch(err){
+			continue;
+		}
+		let lessthani = lslen-1;
+		
+	}
+
+	window.localStorage.removeItem("ALN");
+	window.localStorage.removeItem("ALNXPUB");
+	window.localStorage.removeItem("ALNSTART");
+	
+	
+	
+}
+
+function calcTotal(numinputs,numoutputs,satperbyte,totalsatoshis){
+	var estimatedByteCount = getByteCountSegwitP2SH(numinputs, numoutputs)
+	var estimatedFeeSatoshis = Math.ceil(estimatedByteCount * satperbyte)
+	var totalSatoshisMinusFee = totalsatoshis - estimatedFeeSatoshis
+	return totalSatoshisMinusFee
+}
+
+function getByteCountSegwitP2SH(inputCount,outputCount) {
+	  var inputSize = 108 + (64 * 4)
+	  var outputSize = 34 * 4
+	  var estimatedWeight = inputSize * inputCount + outputSize * outputCount + 10 * 4
+	  return Math.ceil(estimatedWeight / 4)
+}  
+
+function changeExchange(){
+	var exchInput = document.getElementById("exchange_rate");
+	var exchangeRate = exchInput.value;
+	var balance = $("#balance").val();
+	$("#balanceusd").val("$"+(exchangeRate * balance).toFixed(2))
+	
+}
+
+function allStorage() {
+
+    var values = [],
+        keys = Object.keys(localStorage),
+        i = keys.length;
+
+    while ( i-- ) {
+        values.push( localStorage.getItem(keys[i]) );
+    }
+
+    return values;
+}
+</script>
+</body>
+</html>
